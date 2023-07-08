@@ -3,8 +3,27 @@ import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
 import math
-from matplotlib import pyplot as plt
 import pdb
+
+from sklearn.cluster import KMeans
+from sklearn.preprocessing import OneHotEncoder
+
+
+def sp_to_spt(mat):
+    coo = mat.tocoo()
+    values = coo.data
+    indices = np.vstack((coo.row, coo.col))
+
+    i = torch.LongTensor(indices)
+    v = torch.FloatTensor(values)
+    shape = coo.shape
+
+    return torch.sparse.FloatTensor(i, v, torch.Size(shape))
+
+def mat2tensor(mat):
+    if type(mat) is np.ndarray:
+        return torch.from_numpy(mat).type(torch.FloatTensor)
+    return sp_to_spt(mat)
 
 
 class GTN(nn.Module):
@@ -81,11 +100,32 @@ class GTN(nn.Module):
         #H,W2 = self.layer2(A, H)
         #H = self.normalization(H)
         #H,W3 = self.layer3(A, H)
+
+        X_dense_list = [x.to_dense() for x in X]
+
+        # 遍历每个二维矩阵
+        for i, matrix in enumerate(X_dense_list):
+            # 使用 KMeans 聚类
+            kmeans = KMeans(n_clusters=10)
+            clusters = kmeans.fit_predict(matrix)
+
+            # 将聚类结果转换为独热矩阵
+            enc = OneHotEncoder(sparse=False)
+            clusters_onehot = enc.fit_transform(clusters.reshape(-1, 1))
+
+            # 将独热矩阵拼接到原始二维矩阵的每一行后面
+            matrix_with_clusters = np.hstack((matrix, clusters_onehot))
+
+            # 更新 X_dense_list 中的对应矩阵
+            X_dense_list[i] = matrix_with_clusters
+
+        X_with_labels = [mat2tensor(x) for x in X_dense_list]
+
         for i in range(self.num_channels):
             if i==0:
-                X_ = F.relu(self.gcn_conv(X,H[i]))
+                X_ = F.relu(self.gcn_conv(X_with_labels,H[i]))
             else:
-                X_tmp = F.relu(self.gcn_conv(X,H[i]))
+                X_tmp = F.relu(self.gcn_conv(X_with_labels,H[i]))
                 X_ = torch.cat((X_,X_tmp), dim=1)
         X_ = self.linear1(X_)
         X_ = F.relu(X_)

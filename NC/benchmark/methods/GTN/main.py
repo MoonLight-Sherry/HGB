@@ -20,7 +20,7 @@ def load_data(args):
             drop_feat = [0,1,3]
         elif feats_type == 2:
             drop_feat = [0]
-    dl = data_loader('../../data/'+dataset)
+    dl = data_loader('../../data/dataset/'+dataset)
     if dataset == 'DBLP' and not full:
         dl.get_sub_graph([0,1,3])
     if dataset == 'ACM' and not full:
@@ -33,10 +33,10 @@ def load_data(args):
         if th is None or k in drop_feat:
             cnt = dl.nodes['count'][k]
             node_features.append(sp.eye(cnt))
-            w_ins.append(cnt)
+            w_ins.append(cnt+10)
         else:
             node_features.append(th)
-            w_ins.append(th.shape[1])
+            w_ins.append(th.shape[1]+10)
     val_ratio = 0.2
     train_idx = np.nonzero(dl.labels_train['mask'])[0]
     np.random.shuffle(train_idx)
@@ -75,7 +75,7 @@ def mat2tensor(mat):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--dataset', type=str,
+    parser.add_argument('--dataset', type=str,default="ACM",
                         help='Dataset')
     parser.add_argument('--epoch', type=int, default=40,
                         help='Training Epochs')
